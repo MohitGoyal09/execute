@@ -1,32 +1,39 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
 export async function middleware(request: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req: request, res })
+  // Create a response object that we'll modify and return
+  const res = NextResponse.next();
 
+  // Create a Supabase client configured to use cookies
+  const supabase = createMiddlewareClient({ req: request, res });
+
+  // Refresh session if expired - required for Server Components
   const {
     data: { session },
-  } = await supabase.auth.getSession()
+  } = await supabase.auth.getSession();
 
-  // Protect dashboard routes
-  if (request.nextUrl.pathname.startsWith('/dashboard')) {
-    if (!session) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
+  // Check if the user is authenticated
+  const isAuthenticated = !!session;
+  const isAuthRoute =
+    request.nextUrl.pathname.startsWith("/auth") &&
+    !request.nextUrl.pathname.startsWith("/auth/callback");
+  const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
+
+  // If user is on an auth page but already authenticated, redirect to dashboard
+  if (isAuthRoute && isAuthenticated) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Redirect authenticated users away from auth pages
-  if (request.nextUrl.pathname.startsWith('/auth')) {
-    if (session) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+  // If user is trying to access dashboard but not authenticated, redirect to login
+  if (isDashboardRoute && !isAuthenticated) {
+    return NextResponse.redirect(new URL("/auth/server-login", request.url));
   }
 
-  return res
+  return res;
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/auth/:path*'],
-}
+  matcher: ["/dashboard/:path*", "/auth/:path*"],
+};

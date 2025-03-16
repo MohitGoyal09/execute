@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
@@ -21,8 +21,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "@/components/theme-toggle";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { signOut as serverSignOut } from "@/app/actions";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -39,68 +40,83 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [userType, setUserType] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("/dashboard");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     async function getUser() {
       try {
-        const { data, error } = await supabase.auth.getUser();
+        console.log("Checking for user in dashboard layout");
+        const currentUser = await getCurrentUser();
+        console.log("Current user:", currentUser);
 
-        if (error) {
-          console.error("Auth error:", error.message);
-          router.push("/auth/login");
+        if (!currentUser) {
+          console.log("No user found, redirecting to login");
+          setAuthError("No authenticated user found");
+          window.location.href = "/auth/server-login";
           return;
         }
 
-        if (!data?.user) {
-          router.push("/auth/login");
-          return;
-        }
-
-        setUser(data.user);
-        setUserType(data.user.user_metadata?.user_type || "");
-        setIsLoading(false);
+        setUser(currentUser);
+        setUserType(currentUser.user_metadata?.user_type || "");
+        console.log("User type:", currentUser.user_metadata?.user_type);
       } catch (error) {
         console.error("Error fetching user:", error);
-        router.push("/auth/login");
+        setAuthError("Error fetching user");
+      } finally {
+        setLoading(false);
       }
     }
 
     getUser();
 
-    // Set active item based on current path
-    setActiveItem(window.location.pathname);
+    // Set up auth state change listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log("Auth state changed:", event);
+        if (event === "SIGNED_OUT") {
+          window.location.href = "/auth/login";
+        } else if (event === "SIGNED_IN" && session) {
+          setUser(session.user);
+          setUserType(session.user.user_metadata?.user_type || "");
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, [router]);
 
   const handleSignOut = async () => {
     try {
-      setIsLoading(true);
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error("Sign out error:", error.message);
-        toast({
-          variant: "destructive",
-          title: "Error signing out",
-          description: error.message,
-        });
-        return;
-      }
-
-      router.push("/");
+      // Use the server action for sign out
+      await serverSignOut();
     } catch (error) {
       console.error("Error signing out:", error);
-    } finally {
-      setIsLoading(false);
+      toast.error("Failed to sign out");
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <p>Authentication error: {authError}</p>
+        </div>
+        <Button onClick={() => (window.location.href = "/auth/server-login")}>
+          Go to Login
+        </Button>
       </div>
     );
   }
@@ -193,7 +209,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               href="/dashboard"
               className="flex items-center gap-2 font-semibold"
             >
-              <span className="gradient-text text-xl font-bold">RentSmart</span>
+              <span className="gradient-text text-xl font-bold">
+                DealBroker
+              </span>
             </Link>
           </div>
           <nav className="flex-1 overflow-auto py-4">
@@ -286,7 +304,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     onClick={() => setOpen(false)}
                   >
                     <span className="gradient-text text-xl font-bold">
-                      RentSmart
+                      DealBroker
                     </span>
                   </Link>
                   <Button
@@ -371,7 +389,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="md:hidden fixed top-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b z-10 shadow-sm">
         <div className="flex items-center justify-between p-4">
           <Link href="/dashboard" className="flex items-center">
-            <span className="gradient-text text-xl font-bold">RentSmart</span>
+            <span className="gradient-text text-xl font-bold">DealBroker</span>
           </Link>
           <div className="flex items-center space-x-3">
             <ModeToggle />
