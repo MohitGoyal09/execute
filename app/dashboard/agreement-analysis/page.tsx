@@ -525,13 +525,12 @@ export default function AgreementAnalysisPage() {
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={() =>
-                    (
-                      document.querySelector(
-                        '[data-value="upload"]'
-                      ) as HTMLElement
-                    )?.click()
-                  }
+                  onClick={() => {
+                    const uploadTab = document.querySelector('[data-value="upload"]');
+                    if (uploadTab && uploadTab instanceof HTMLElement) {
+                      uploadTab.click();
+                    }
+                  }}
                 >
                   Upload an Agreement
                 </Button>

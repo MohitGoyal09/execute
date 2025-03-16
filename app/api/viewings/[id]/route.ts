@@ -173,7 +173,7 @@ export async function DELETE(
   // Get the viewing
   const { data: viewing, error: viewingError } = await supabase
     .from("property_viewings")
-    .select("tenant_id, properties(landlord_id)")
+    .select("tenant_id, properties:property_id(landlord_id)")
     .eq("id", id)
     .single();
 
@@ -184,7 +184,8 @@ export async function DELETE(
   // Check if user has permission to delete this viewing
   if (
     viewing.tenant_id !== user.id &&
-    viewing.properties?.landlord_id !== user.id
+    viewing.properties &&
+    viewing.properties.landlord_id !== user.id
   ) {
     return NextResponse.json(
       { error: "You do not have permission to delete this viewing" },
