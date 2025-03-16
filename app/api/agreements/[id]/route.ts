@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+// This function is required for routes with dynamic parameters when using "output: export"
+export async function generateStaticParams() {
+  return [];
+}
+
 // GET /api/agreements/[id] - Get a specific rental agreement
 export async function GET(
   request: NextRequest,

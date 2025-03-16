@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// This function is required for routes with dynamic parameters when using "output: export"
+export async function generateStaticParams() {
+  return [];
+}
+
 // POST /api/agreements/[id]/verify - Verify an agreement using AI
 export async function POST(
   request: NextRequest,
