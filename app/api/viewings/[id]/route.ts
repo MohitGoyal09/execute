@@ -184,7 +184,7 @@ export async function DELETE(
   // Check if user has permission to delete this viewing
   if (
     viewing.tenant_id !== user.id &&
-    viewing.properties.landlord_id !== user.id
+    viewing.properties?.landlord_id !== user.id
   ) {
     return NextResponse.json(
       { error: "You do not have permission to delete this viewing" },

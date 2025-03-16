@@ -224,6 +224,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </nav>
           <div className="mt-auto border-t p-4">
             <div className="flex items-center gap-2">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback>
+                  {user?.email?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex-1 overflow-hidden">
                 <p className="text-sm font-medium leading-none">
                   {user?.email}
@@ -270,11 +275,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             onClick={() => setOpen(false)}
           >
             <div
-              className="fixed inset-y-0 right-0 z-40 w-full max-w-xs border-l bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-6"
+              className="fixed inset-y-0 left-0 z-40 w-full max-w-xs border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex h-full flex-col">
-                <div className="flex items-center justify-between">
+                <div className="flex h-14 items-center justify-between border-b mb-2">
                   <Link
                     href="/dashboard"
                     className="flex items-center gap-2 font-semibold"
@@ -294,30 +299,40 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span className="sr-only">Close</span>
                   </Button>
                 </div>
-                <nav className="mt-8 flex-1">
-                  <div className="space-y-1">
-                    {items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground",
-                          "focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                          item.active
-                            ? "bg-accent/50 text-accent-foreground"
-                            : "transparent",
-                          "btn-hover-effect"
-                        )}
-                        onClick={() => setOpen(false)}
-                      >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    ))}
+                <nav className="flex-1 overflow-auto py-2">
+                  <div className="px-1">
+                    <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+                      Dashboard
+                    </h2>
+                    <div className="space-y-1">
+                      {items.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground",
+                            "focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                            item.active
+                              ? "bg-accent/50 text-accent-foreground"
+                              : "transparent",
+                            "btn-hover-effect"
+                          )}
+                          onClick={() => setOpen(false)}
+                        >
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </nav>
                 <div className="mt-auto border-t pt-4">
                   <div className="flex items-center gap-2">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback>
+                        {user?.email?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex-1 overflow-hidden">
                       <p className="text-sm font-medium leading-none">
                         {user?.email}
@@ -353,26 +368,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <Sidebar items={navItems} />
 
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10 shadow-sm">
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b z-10 shadow-sm">
         <div className="flex items-center justify-between p-4">
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
-              RentSmart
-            </span>
+          <Link href="/dashboard" className="flex items-center">
+            <span className="gradient-text text-xl font-bold">RentSmart</span>
           </Link>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <ThemeToggle />
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-slate-700 dark:text-slate-300"
+              className="h-8 w-8"
             >
               {isMobileMenuOpen ? (
-                <X className="h-6 w-6" />
+                <X className="h-4 w-4" />
               ) : (
-                <Menu className="h-6 w-6" />
+                <Menu className="h-4 w-4" />
               )}
+              <span className="sr-only">Toggle menu</span>
             </Button>
           </div>
         </div>
