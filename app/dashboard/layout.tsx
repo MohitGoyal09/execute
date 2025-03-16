@@ -16,13 +16,23 @@ import {
   X,
   User,
   Settings,
+  FileSearch,
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+}
+
+interface Item {
+  href: string;
+  title: string;
+  icon: React.ElementType;
+  active?: boolean;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -31,13 +41,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [userType, setUserType] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState("/dashboard");
 
   useEffect(() => {
     async function getUser() {
       try {
         const { data, error } = await supabase.auth.getUser();
 
-        if (error || !data?.user) {
+        if (error) {
+          console.error("Auth error:", error.message);
+          router.push("/auth/login");
+          return;
+        }
+
+        if (!data?.user) {
           router.push("/auth/login");
           return;
         }
@@ -46,151 +63,300 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         setUserType(data.user.user_metadata?.user_type || "");
         setIsLoading(false);
       } catch (error) {
+        console.error("Error fetching user:", error);
         router.push("/auth/login");
       }
     }
 
     getUser();
+
+    // Set active item based on current path
+    setActiveItem(window.location.pathname);
   }, [router]);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Sign out error:", error.message);
+        toast({
+          variant: "destructive",
+          title: "Error signing out",
+          description: error.message,
+        });
+        return;
+      }
+
+      router.push("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  const navItems =
+  const navItems: Item[] =
     userType === "landlord"
       ? [
           {
             href: "/dashboard",
-            label: "Dashboard",
-            icon: <LayoutDashboard className="h-5 w-5" />,
+            title: "Dashboard",
+            icon: LayoutDashboard,
+            active: activeItem === "/dashboard",
           },
           {
             href: "/dashboard/properties",
-            label: "My Properties",
-            icon: <Home className="h-5 w-5" />,
+            title: "My Properties",
+            icon: Home,
+            active: activeItem.startsWith("/dashboard/properties"),
           },
           {
             href: "/dashboard/viewings",
-            label: "Viewings",
-            icon: <Calendar className="h-5 w-5" />,
+            title: "Viewings",
+            icon: Calendar,
+            active: activeItem.startsWith("/dashboard/viewings"),
           },
           {
             href: "/dashboard/negotiations",
-            label: "Negotiations",
-            icon: <MessageSquare className="h-5 w-5" />,
+            title: "Negotiations",
+            icon: MessageSquare,
+            active: activeItem.startsWith("/dashboard/negotiations"),
           },
           {
             href: "/dashboard/agreements",
-            label: "Agreements",
-            icon: <FileText className="h-5 w-5" />,
+            title: "Agreements",
+            icon: FileText,
+            active: activeItem.startsWith("/dashboard/agreements"),
+          },
+          {
+            href: "/dashboard/agreement-analysis",
+            title: "Agreement Analysis",
+            icon: FileSearch,
+            active: activeItem.startsWith("/dashboard/agreement-analysis"),
           },
         ]
       : [
           {
             href: "/dashboard",
-            label: "Dashboard",
-            icon: <LayoutDashboard className="h-5 w-5" />,
+            title: "Dashboard",
+            icon: LayoutDashboard,
+            active: activeItem === "/dashboard",
           },
           {
             href: "/dashboard/properties",
-            label: "Find Properties",
-            icon: <Home className="h-5 w-5" />,
+            title: "Find Properties",
+            icon: Home,
+            active: activeItem.startsWith("/dashboard/properties"),
           },
           {
             href: "/dashboard/viewings",
-            label: "My Viewings",
-            icon: <Calendar className="h-5 w-5" />,
+            title: "My Viewings",
+            icon: Calendar,
+            active: activeItem.startsWith("/dashboard/viewings"),
           },
           {
             href: "/dashboard/negotiations",
-            label: "Negotiations",
-            icon: <MessageSquare className="h-5 w-5" />,
+            title: "Negotiations",
+            icon: MessageSquare,
+            active: activeItem.startsWith("/dashboard/negotiations"),
           },
           {
             href: "/dashboard/agreements",
-            label: "My Agreements",
-            icon: <FileText className="h-5 w-5" />,
+            title: "My Agreements",
+            icon: FileText,
+            active: activeItem.startsWith("/dashboard/agreements"),
+          },
+          {
+            href: "/dashboard/agreement-analysis",
+            title: "Agreement Analysis",
+            icon: FileSearch,
+            active: activeItem.startsWith("/dashboard/agreement-analysis"),
           },
         ];
 
-  return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-slate-900">
-      {/* Sidebar for desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700">
-        <div className="p-4">
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
-              RentSmart
-            </span>
-          </Link>
-        </div>
-        <Separator />
-        <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
+  const Sidebar = ({ items }: { items: Item[] }) => {
+    return (
+      <div className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:block">
+        <div className="flex h-full flex-col">
+          <div className="flex h-14 items-center border-b px-4">
             <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              href="/dashboard"
+              className="flex items-center gap-2 font-semibold"
             >
-              {item.icon}
-              <span>{item.label}</span>
+              <span className="gradient-text text-xl font-bold">RentSmart</span>
             </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-gray-200 dark:border-slate-700">
-          <div className="flex items-center space-x-3 mb-4">
-            <Avatar>
-              <AvatarFallback>
-                {user?.user_metadata?.full_name
-                  ?.split(" ")
-                  .map((n: string) => n[0])
-                  .join("") || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium">
-                {user?.user_metadata?.full_name || "User"}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                {userType}
-              </p>
+          </div>
+          <nav className="flex-1 overflow-auto py-4">
+            <div className="px-3">
+              <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+                Dashboard
+              </h2>
+              <div className="space-y-1">
+                {items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground",
+                      "focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                      item.active
+                        ? "bg-accent/50 text-accent-foreground"
+                        : "transparent",
+                      "btn-hover-effect"
+                    )}
+                  >
+                    <item.icon className="mr-2 h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </nav>
+          <div className="mt-auto border-t p-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-medium leading-none">
+                  {user?.email}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {user?.user_metadata?.user_type === "landlord"
+                    ? "Landlord"
+                    : "Tenant"}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSignOut}
+                className="ml-auto h-8 w-8 p-0"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="sr-only">Sign out</span>
+              </Button>
             </div>
           </div>
-          <div className="flex items-center justify-between">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/profile">
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Link>
-            </Button>
-            <ThemeToggle />
-          </div>
-          <Button
-            variant="ghost"
-            className="w-full mt-4 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-            onClick={handleSignOut}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
         </div>
-      </aside>
+      </div>
+    );
+  };
+
+  const MobileMenu = ({ items }: { items: Item[] }) => {
+    const [open, setOpen] = useState(false);
+
+    return (
+      <>
+        <Button
+          variant="outline"
+          size="icon"
+          className="fixed right-4 top-3 z-50 lg:hidden"
+          onClick={() => setOpen(!open)}
+        >
+          {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          <span className="sr-only">Toggle menu</span>
+        </Button>
+        {open && (
+          <div
+            className="fixed inset-0 z-40 lg:hidden"
+            onClick={() => setOpen(false)}
+          >
+            <div
+              className="fixed inset-y-0 right-0 z-40 w-full max-w-xs border-l bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex h-full flex-col">
+                <div className="flex items-center justify-between">
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 font-semibold"
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="gradient-text text-xl font-bold">
+                      RentSmart
+                    </span>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                  </Button>
+                </div>
+                <nav className="mt-8 flex-1">
+                  <div className="space-y-1">
+                    {items.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground",
+                          "focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                          item.active
+                            ? "bg-accent/50 text-accent-foreground"
+                            : "transparent",
+                          "btn-hover-effect"
+                        )}
+                        onClick={() => setOpen(false)}
+                      >
+                        <item.icon className="mr-2 h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </nav>
+                <div className="mt-auto border-t pt-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-sm font-medium leading-none">
+                        {user?.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.user_metadata?.user_type === "landlord"
+                          ? "Landlord"
+                          : "Tenant"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSignOut}
+                      className="ml-auto h-8 w-8 p-0"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="sr-only">Sign out</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+      {/* Sidebar for desktop */}
+      <Sidebar items={navItems} />
 
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 z-10">
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10 shadow-sm">
         <div className="flex items-center justify-between p-4">
           <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
+            <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
               RentSmart
             </span>
           </Link>
@@ -200,6 +366,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="ghost"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-slate-700 dark:text-slate-300"
             >
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -212,73 +379,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       {/* Mobile menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 bg-gray-800/50 z-20 backdrop-blur-sm">
-          <div className="absolute right-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-800 shadow-xl">
-            <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-              <div className="flex items-center space-x-3">
-                <Avatar>
-                  <AvatarFallback>
-                    {user?.user_metadata?.full_name
-                      ?.split(" ")
-                      .map((n: string) => n[0])
-                      .join("") || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">
-                    {user?.user_metadata?.full_name || "User"}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                    {userType}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <nav className="p-4 space-y-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-              <Separator className="my-2" />
-              <Link
-                href="/dashboard/profile"
-                className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <User className="h-5 w-5" />
-                <span>Profile</span>
-              </Link>
-              <Link
-                href="/dashboard/settings"
-                className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Settings className="h-5 w-5" />
-                <span>Settings</span>
-              </Link>
-              <button
-                className="flex items-center space-x-2 px-3 py-2 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
-                onClick={handleSignOut}
-              >
-                <LogOut className="h-5 w-5" />
-                <span>Sign Out</span>
-              </button>
-            </nav>
-          </div>
-        </div>
-      )}
+      {isMobileMenuOpen && <MobileMenu items={navItems} />}
 
       {/* Main content */}
       <main className="flex-1 md:ml-64 pt-16 md:pt-0">
-        <div className="p-6">{children}</div>
+        <div className="p-6 max-w-7xl mx-auto">{children}</div>
       </main>
     </div>
   );

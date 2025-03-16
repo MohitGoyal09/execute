@@ -1,16 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  getCurrentUser,
+  getProperties,
+  getViewings,
+  getNegotiations,
+  getAgreements,
+} from "@/lib/supabase/api";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Home,
   Calendar,
@@ -18,38 +26,85 @@ import {
   FileText,
   Plus,
   ArrowRight,
+  Loader2,
+  User,
+  Building,
+  Key,
+  FileSearch,
 } from "lucide-react";
-import Link from "next/link";
+import { toast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [userType, setUserType] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [properties, setProperties] = useState<any[]>([]);
+  const [viewings, setViewings] = useState<any[]>([]);
+  const [negotiations, setNegotiations] = useState<any[]>([]);
+  const [agreements, setAgreements] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    properties: 0,
+    viewings: 0,
+    negotiations: 0,
+    agreements: 0,
+  });
 
   useEffect(() => {
-    async function getUser() {
+    async function loadDashboardData() {
       try {
-        const { data, error } = await supabase.auth.getUser();
-
-        if (error || !data?.user) {
+        // Get current user
+        const userData = await getCurrentUser();
+        if (!userData) {
+          router.push("/auth/login");
           return;
         }
 
-        setUser(data.user);
-        setUserType(data.user.user_metadata?.user_type || "");
+        setUser(userData);
+        const userTypeValue = userData.user_metadata?.user_type || "";
+        setUserType(userTypeValue);
+
+        // Fetch data in parallel
+        const [propertiesData, viewingsData, negotiationsData, agreementsData] =
+          await Promise.all([
+            getProperties(userData.id, userTypeValue),
+            getViewings(userData.id, userTypeValue),
+            getNegotiations(userData.id, userTypeValue),
+            getAgreements(userData.id, userTypeValue),
+          ]);
+
+        setProperties(propertiesData || []);
+        setViewings(viewingsData || []);
+        setNegotiations(negotiationsData || []);
+        setAgreements(agreementsData || []);
+
+        // Set stats
+        setStats({
+          properties: propertiesData?.length || 0,
+          viewings: viewingsData?.length || 0,
+          negotiations: negotiationsData?.length || 0,
+          agreements: agreementsData?.length || 0,
+        });
+
         setIsLoading(false);
       } catch (error) {
-        console.error("Error fetching user:", error);
+        console.error("Error loading dashboard data:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+        });
+        setIsLoading(false);
       }
     }
 
-    getUser();
-  }, []);
+    loadDashboardData();
+  }, [router]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -57,407 +112,370 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back, {user?.user_metadata?.full_name || "User"}!
+        <h1 className="text-3xl font-bold tracking-tight">
+          Welcome, {user?.user_metadata?.name || user?.email}
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Here's an overview of your{" "}
+          {userType === "landlord" ? "rental properties" : "rental journey"}
         </p>
       </div>
 
-      {userType === "landlord" ? <LandlordDashboard /> : <TenantDashboard />}
-    </div>
-  );
-}
-
-function LandlordDashboard() {
-  return (
-    <div className="space-y-8">
-      {/* Quick Actions */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Add a Property</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                List a new property for potential tenants to discover.
-              </p>
-              <Button asChild>
-                <Link href="/dashboard/properties/new">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Property
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Create Agreement</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Draft a new rental agreement using our templates.
-              </p>
-              <Button asChild>
-                <Link href="/dashboard/agreements/new">
-                  <FileText className="h-4 w-4 mr-2" />
-                  New Agreement
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">View Requests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Check viewing requests and messages from potential tenants.
-              </p>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/viewings">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  View Requests
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Property Overview */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Property Overview</h2>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/properties">
-              View All
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card className="bg-gray-50 dark:bg-slate-800 border-dashed border-2">
-            <CardContent className="pt-6 flex flex-col items-center justify-center h-[200px]">
-              <Plus className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-muted-foreground">Add a new property</p>
-              <Button variant="ghost" className="mt-4" asChild>
-                <Link href="/dashboard/properties/new">Add Property</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          {/* Sample properties would be mapped here from real data */}
-          <PropertyCard
-            title="2 Bedroom Apartment"
-            address="123 Main St, Anytown"
-            status="Available"
-            imageUrl="/images/property-sample-1.jpg"
-          />
-          <PropertyCard
-            title="3 Bedroom House"
-            address="456 Oak Ave, Somewhere"
-            status="Rented"
-            imageUrl="/images/property-sample-2.jpg"
-          />
-        </div>
-      </section>
-
-      {/* Recent Activity */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <Card>
-          <CardContent className="p-0">
-            <div className="p-4 border-b">
-              <div className="flex items-start gap-4">
-                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full">
-                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="font-medium">New viewing request</p>
-                  <p className="text-sm text-muted-foreground">
-                    John Doe requested to view 2 Bedroom Apartment
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    2 hours ago
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-b">
-              <div className="flex items-start gap-4">
-                <div className="bg-green-100 dark:bg-green-900 p-2 rounded-full">
-                  <MessageSquare className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="font-medium">New message</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sarah Smith sent you a message about 3 Bedroom House
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Yesterday
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="flex items-start gap-4">
-                <div className="bg-purple-100 dark:bg-purple-900 p-2 rounded-full">
-                  <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <p className="font-medium">Agreement signed</p>
-                  <p className="text-sm text-muted-foreground">
-                    Michael Johnson signed the rental agreement for 3 Bedroom
-                    House
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    3 days ago
-                  </p>
-                </div>
-              </div>
+      {/* Stats Overview */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border-blue-100 dark:border-blue-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {userType === "landlord" ? "Properties" : "Saved Properties"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.properties}</div>
+              <Home className="h-5 w-5 text-blue-600" />
             </div>
           </CardContent>
         </Card>
-      </section>
-    </div>
-  );
-}
 
-function TenantDashboard() {
-  return (
-    <div className="space-y-8">
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/40 dark:to-pink-950/40 border-purple-100 dark:border-purple-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Viewings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.viewings}</div>
+              <Calendar className="h-5 w-5 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 border-amber-100 dark:border-amber-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Negotiations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.negotiations}</div>
+              <MessageSquare className="h-5 w-5 text-amber-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 border-green-100 dark:border-green-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Agreements
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{stats.agreements}</div>
+              <FileText className="h-5 w-5 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Quick Actions */}
-      <section>
+      <div>
         <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Find Properties</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Browse available properties that match your criteria.
-              </p>
-              <Button asChild>
-                <Link href="/dashboard/properties">
-                  <Home className="h-4 w-4 mr-2" />
-                  Browse Properties
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">My Viewings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Check your scheduled property viewings.
-              </p>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/viewings">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  View Schedule
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">My Agreements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Access your rental agreements and documents.
-              </p>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/agreements">
-                  <FileText className="h-4 w-4 mr-2" />
-                  View Agreements
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Property Search */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Find Your Next Home</h2>
-        <Card>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="all">
-              <TabsList className="mb-4">
-                <TabsTrigger value="all">All Properties</TabsTrigger>
-                <TabsTrigger value="apartments">Apartments</TabsTrigger>
-                <TabsTrigger value="houses">Houses</TabsTrigger>
-                <TabsTrigger value="favorites">Favorites</TabsTrigger>
-              </TabsList>
-              <TabsContent value="all" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <PropertyCard
-                    title="2 Bedroom Apartment"
-                    address="123 Main St, Anytown"
-                    status="Available"
-                    imageUrl="/images/property-sample-1.jpg"
-                  />
-                  <PropertyCard
-                    title="3 Bedroom House"
-                    address="456 Oak Ave, Somewhere"
-                    status="Available"
-                    imageUrl="/images/property-sample-2.jpg"
-                  />
-                  <PropertyCard
-                    title="Studio Apartment"
-                    address="789 Pine St, Elsewhere"
-                    status="Available"
-                    imageUrl="/images/property-sample-3.jpg"
-                  />
-                </div>
-                <div className="text-center mt-4">
-                  <Button variant="outline" asChild>
-                    <Link href="/dashboard/properties">
-                      View All Properties
-                      <ArrowRight className="ml-2 h-4 w-4" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {userType === "landlord" ? (
+            <>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Add Property</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    List a new property for rent
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild className="w-full">
+                    <Link href="/dashboard/properties/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Property
                     </Link>
                   </Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="apartments">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <PropertyCard
-                    title="2 Bedroom Apartment"
-                    address="123 Main St, Anytown"
-                    status="Available"
-                    imageUrl="/images/property-sample-1.jpg"
-                  />
-                  <PropertyCard
-                    title="Studio Apartment"
-                    address="789 Pine St, Elsewhere"
-                    status="Available"
-                    imageUrl="/images/property-sample-3.jpg"
-                  />
-                </div>
-              </TabsContent>
-              <TabsContent value="houses">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <PropertyCard
-                    title="3 Bedroom House"
-                    address="456 Oak Ave, Somewhere"
-                    status="Available"
-                    imageUrl="/images/property-sample-2.jpg"
-                  />
-                </div>
-              </TabsContent>
-              <TabsContent value="favorites">
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>You haven&apos;t saved any favorites yet.</p>
-                  <Button variant="link" asChild>
-                    <Link href="/dashboard/properties">Browse properties</Link>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Manage Viewings</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Review and respond to viewing requests
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/viewings">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      View Requests
+                    </Link>
                   </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </section>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Create Agreement</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Draft a new rental agreement
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/agreements/new">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Create Agreement
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Analyze Agreement</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Get AI insights on a rental agreement
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/agreement-analysis">
+                      <FileSearch className="mr-2 h-4 w-4" />
+                      Analyze
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Find Properties</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Browse available rental properties
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild className="w-full">
+                    <Link href="/dashboard/properties">
+                      <Home className="mr-2 h-4 w-4" />
+                      Browse Properties
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Schedule Viewing</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Request a property viewing
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/viewings">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      My Viewings
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">My Agreements</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    View and manage your rental agreements
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/agreements">
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Agreements
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Analyze Agreement</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Get AI insights on a rental agreement
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/agreement-analysis">
+                      <FileSearch className="mr-2 h-4 w-4" />
+                      Analyze
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Recent Activity */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <Card>
-          <CardContent className="p-0">
-            <div className="p-4 border-b">
-              <div className="flex items-start gap-4">
-                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full">
-                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="font-medium">Viewing confirmed</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your viewing for 2 Bedroom Apartment has been confirmed
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    1 day ago
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-b">
-              <div className="flex items-start gap-4">
-                <div className="bg-green-100 dark:bg-green-900 p-2 rounded-full">
-                  <MessageSquare className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="font-medium">New message</p>
-                  <p className="text-sm text-muted-foreground">
-                    You received a message from landlord about 3 Bedroom House
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    2 days ago
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="flex items-start gap-4">
-                <div className="bg-purple-100 dark:bg-purple-900 p-2 rounded-full">
-                  <Home className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <p className="font-medium">Property viewed</p>
-                  <p className="text-sm text-muted-foreground">
-                    You viewed details for Studio Apartment
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    3 days ago
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-    </div>
-  );
-}
-
-interface PropertyCardProps {
-  title: string;
-  address: string;
-  status: string;
-  imageUrl: string;
-}
-
-function PropertyCard({ title, address, status, imageUrl }: PropertyCardProps) {
-  return (
-    <Card className="overflow-hidden">
-      <div className="aspect-video relative">
-        <div className="absolute top-2 right-2 bg-white dark:bg-slate-800 text-xs font-medium px-2 py-1 rounded-full">
-          {status}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Recent Activity</h2>
+          {userType === "landlord" ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard/properties">
+                View All Properties
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard/viewings">
+                View All Viewings
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          )}
         </div>
-        <img
-          src={imageUrl}
-          alt={title}
-          className="w-full h-full object-cover"
-        />
+
+        {userType === "landlord" ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {properties.length > 0 ? (
+              properties.slice(0, 3).map((property) => (
+                <Card key={property.id}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">
+                      {property.title}
+                    </CardTitle>
+                    <CardDescription>{property.address}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="flex justify-between text-sm">
+                      <span>£{property.price_per_month}/month</span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs ${
+                          property.status === "available"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
+                        }`}
+                      >
+                        {property.status === "available"
+                          ? "Available"
+                          : "Pending"}
+                      </span>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href={`/dashboard/properties/${property.id}`}>
+                        View Details
+                      </Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))
+            ) : (
+              <Card className="col-span-full">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <Building className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    No properties listed yet
+                  </p>
+                  <Button asChild>
+                    <Link href="/dashboard/properties/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Property
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {viewings.length > 0 ? (
+              viewings.slice(0, 3).map((viewing) => (
+                <Card key={viewing.id}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">
+                      {viewing.properties?.title || "Property Viewing"}
+                    </CardTitle>
+                    <CardDescription>
+                      {viewing.properties?.address || "Address not available"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        {new Date(viewing.viewing_date).toLocaleDateString()}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs ${
+                          viewing.status === "confirmed"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                            : viewing.status === "pending"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                        }`}
+                      >
+                        {viewing.status.charAt(0).toUpperCase() +
+                          viewing.status.slice(1)}
+                      </span>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href="/dashboard/viewings">View Details</Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))
+            ) : (
+              <Card className="col-span-full">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    No viewings scheduled yet
+                  </p>
+                  <Button asChild>
+                    <Link href="/dashboard/properties">
+                      <Home className="mr-2 h-4 w-4" />
+                      Browse Properties
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
-      <CardContent className="pt-4">
-        <h3 className="font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{address}</p>
-        <div className="flex justify-between items-center mt-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link
-              href={`/dashboard/properties/${encodeURIComponent(
-                title.toLowerCase().replace(/ /g, "-")
-              )}`}
-            >
-              View Details
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

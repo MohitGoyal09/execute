@@ -22,6 +22,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card"
 import {
   Select,
@@ -31,17 +32,21 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "@/hooks/use-toast"
+import Link from "next/link"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 const signUpSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
-  fullName: z.string().min(2),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  fullName: z.string().min(2, "Full name must be at least 2 characters"),
   userType: z.enum(["landlord", "tenant"]),
 })
 
 export default function SignUpPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
@@ -56,8 +61,9 @@ export default function SignUpPage() {
   async function onSubmit(values: z.infer<typeof signUpSchema>) {
     try {
       setIsLoading(true)
+      setAuthError(null)
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
@@ -68,7 +74,10 @@ export default function SignUpPage() {
         },
       })
 
-      if (error) throw error
+      if (error) {
+        setAuthError(error.message)
+        throw error
+      }
 
       toast({
         title: "Account created successfully!",
@@ -76,11 +85,12 @@ export default function SignUpPage() {
       })
 
       router.push("/auth/login")
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Signup error:", error)
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Something went wrong. Please try again.",
+        title: "Registration failed",
+        description: error.message || "Something went wrong. Please try again.",
       })
     } finally {
       setIsLoading(false)
@@ -96,6 +106,12 @@ export default function SignUpPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {authError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{authError}</AlertDescription>
+          </Alert>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -167,6 +183,14 @@ export default function SignUpPage() {
           </form>
         </Form>
       </CardContent>
+      <CardFooter className="flex flex-col space-y-2">
+        <div className="text-sm text-center">
+          Already have an account?{" "}
+          <Link href="/auth/login" className="text-blue-600 hover:underline">
+            Sign in
+          </Link>
+        </div>
+      </CardFooter>
     </Card>
   )
 }
