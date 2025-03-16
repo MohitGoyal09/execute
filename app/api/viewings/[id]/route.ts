@@ -128,11 +128,14 @@ export async function PATCH(
     const notificationUserId = isLandlord
       ? viewing.tenant_id
       : viewing.properties.landlord_id;
-    const statusText = {
+
+    const statusMap: Record<string, string> = {
       confirmed: "confirmed",
       cancelled: "cancelled",
       completed: "marked as completed",
-    }[updateData.status];
+    };
+
+    const statusText = statusMap[updateData.status] || updateData.status;
 
     await supabase.from("notifications").insert({
       user_id: notificationUserId,
