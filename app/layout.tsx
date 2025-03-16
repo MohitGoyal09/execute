@@ -7,7 +7,7 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'RentSmart - Intelligent Rental Agreement Platform',
+  title: 'DealBroker - Intelligent Rental Agreement Platform',
   description: 'Smart rental agreements powered by AI',
 }
 

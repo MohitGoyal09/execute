@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ModeToggle } from "@/components/theme-toggle";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -374,7 +374,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <span className="gradient-text text-xl font-bold">RentSmart</span>
           </Link>
           <div className="flex items-center space-x-3">
-            <ThemeToggle />
+            <ModeToggle />
             <Button
               variant="outline"
               size="icon"
