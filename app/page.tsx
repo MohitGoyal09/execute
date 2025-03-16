@@ -22,7 +22,7 @@ export default function HomePage() {
                 Simplified Rental Agreements for Everyone
               </h1>
               <p className="text-xl text-slate-600 dark:text-slate-300">
-                RentSmart transforms the rental process with a user-friendly,
+                DealBroker transforms the rental process with a user-friendly,
                 secure platform that serves both landlords and tenants.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -209,7 +209,7 @@ export default function HomePage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="italic">
-                  &quot;RentSmart made finding and securing my apartment so much
+                  &quot;DealBroker made finding and securing my apartment so much
                   easier. The plain language explanations helped me understand
                   exactly what I was signing.&quot;
                 </p>
@@ -227,7 +227,7 @@ export default function HomePage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="italic">
-                  &quot;As a landlord with multiple properties, RentSmart has
+                  &quot;As a landlord with multiple properties, DealBroker has
                   streamlined my entire rental process. The AI verification
                   gives me confidence that my agreements are complete&quot;
                 </p>
