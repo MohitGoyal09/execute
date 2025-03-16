@@ -24,7 +24,8 @@ export async function GET(
     .select(
       `
       *,
-      properties(*, landlord_id, property_images(*)),
+      property_id,
+      tenant_id,
       profiles!property_viewings_tenant_id_fkey(id, full_name, phone_number, profile_image_url)
     `
     )
@@ -35,18 +36,32 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
 
+  // Get the property information separately
+  const { data: propertyData, error: propertyError } = await supabase
+    .from("properties")
+    .select("*, landlord_id, property_images(*)")
+    .eq("id", viewing.property_id)
+    .single();
+
+  if (propertyError || !propertyData) {
+    return NextResponse.json({ error: "Property not found" }, { status: 404 });
+  }
+
   // Check if user has permission to view this viewing
-  if (
-    viewing.tenant_id !== user.id &&
-    viewing.properties.landlord_id !== user.id
-  ) {
+  if (viewing.tenant_id !== user.id && propertyData.landlord_id !== user.id) {
     return NextResponse.json(
       { error: "You do not have permission to view this viewing" },
       { status: 403 }
     );
   }
 
-  return NextResponse.json({ viewing });
+  // Combine the data
+  const viewingWithProperty = {
+    ...viewing,
+    properties: propertyData,
+  };
+
+  return NextResponse.json({ viewing: viewingWithProperty });
 }
 
 // PATCH /api/viewings/[id] - Update a viewing status
@@ -69,12 +84,23 @@ export async function PATCH(
   // Get the viewing
   const { data: viewing, error: viewingError } = await supabase
     .from("property_viewings")
-    .select("*, properties(landlord_id)")
+    .select("*, property_id, tenant_id")
     .eq("id", id)
     .single();
 
   if (viewingError || !viewing) {
     return NextResponse.json({ error: "Viewing not found" }, { status: 404 });
+  }
+
+  // Get the property information separately
+  const { data: propertyData, error: propertyError } = await supabase
+    .from("properties")
+    .select("landlord_id")
+    .eq("id", viewing.property_id)
+    .single();
+
+  if (propertyError || !propertyData) {
+    return NextResponse.json({ error: "Property not found" }, { status: 404 });
   }
 
   try {
@@ -89,7 +115,7 @@ export async function PATCH(
     }
 
     // Check permissions based on the requested status change
-    const isLandlord = viewing.properties.landlord_id === user.id;
+    const isLandlord = propertyData.landlord_id === user.id;
     const isTenant = viewing.tenant_id === user.id;
 
     if (!isLandlord && !isTenant) {
@@ -127,7 +153,7 @@ export async function PATCH(
     // Create notification for the other party
     const notificationUserId = isLandlord
       ? viewing.tenant_id
-      : viewing.properties.landlord_id;
+      : propertyData.landlord_id;
 
     const statusMap: Record<string, string> = {
       confirmed: "confirmed",
@@ -170,22 +196,28 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Get the viewing
-  const { data: viewing, error: viewingError } = await supabase
+  // First get the viewing to check permissions
+  const { data: viewingData, error: viewingError } = await supabase
     .from("property_viewings")
-    .select("tenant_id, properties:property_id(landlord_id)")
+    .select("tenant_id, property_id")
     .eq("id", id)
     .single();
 
-  if (viewingError || !viewing) {
+  if (viewingError || !viewingData) {
     return NextResponse.json({ error: "Viewing not found" }, { status: 404 });
   }
 
+  // Get the property information separately
+  const { data: propertyData, error: propertyError } = await supabase
+    .from("properties")
+    .select("landlord_id")
+    .eq("id", viewingData.property_id)
+    .single();
+
   // Check if user has permission to delete this viewing
   if (
-    viewing.tenant_id !== user.id &&
-    viewing.properties &&
-    viewing.properties.landlord_id !== user.id
+    viewingData.tenant_id !== user.id &&
+    (!propertyData || propertyData.landlord_id !== user.id)
   ) {
     return NextResponse.json(
       { error: "You do not have permission to delete this viewing" },
